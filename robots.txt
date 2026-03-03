@@ -1,0 +1,118 @@
+(() => {
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  // Year
+  const yearEl = $("#year");
+  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
+
+  // Mobile nav
+  const toggle = $("[data-nav-toggle]");
+  const menu = $("[data-nav-menu]");
+  if (toggle && menu) {
+    toggle.addEventListener("click", () => {
+      const open = menu.classList.toggle("is-open");
+      toggle.setAttribute("aria-expanded", String(open));
+      if (open) {
+        const first = menu.querySelector("a");
+        first?.focus();
+      }
+    });
+
+    // Close on link click
+    menu.addEventListener("click", (e) => {
+      const a = e.target.closest("a");
+      if (!a) return;
+      menu.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+    });
+
+    // Close on escape
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!menu.classList.contains("is-open")) return;
+      menu.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.focus();
+    });
+  }
+
+  // Sticky header shadow on scroll (subtle UX)
+  const header = $("[data-header]");
+  const onScroll = () => {
+    if (!header) return;
+    header.style.boxShadow = window.scrollY > 8 ? "0 10px 40px rgba(0,0,0,.25)" : "none";
+  };
+  window.addEventListener("scroll", onScroll, { passive: true });
+  onScroll();
+
+  // CTA tracking hook (ready for GA4/Plausible)
+  // You can swap this to dataLayer.push(...) or plausible('event', ...)
+  const track = (name, meta = {}) => {
+    // eslint-disable-next-line no-console
+    console.log("[track]", name, meta);
+    // window.dataLayer = window.dataLayer || [];
+    // window.dataLayer.push({ event: name, ...meta });
+  };
+
+  document.addEventListener("click", (e) => {
+    const el = e.target.closest("[data-cta]");
+    if (!el) return;
+    track("cta_click", { cta: el.getAttribute("data-cta"), href: el.getAttribute("href") || "" });
+  });
+
+  // Form: no backend -> mailto prefilled (UX + validation)
+  const form = $("#leadForm");
+  const status = $("#formStatus");
+
+  const setStatus = (msg, ok = true) => {
+    if (!status) return;
+    status.textContent = msg;
+    status.style.color = ok ? "var(--muted)" : "#ffb4b4";
+  };
+
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(email);
+
+  if (form) {
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const data = new FormData(form);
+      const name = String(data.get("name") || "").trim();
+      const email = String(data.get("email") || "").trim();
+      const type = String(data.get("type") || "").trim();
+      const message = String(data.get("message") || "").trim();
+
+      if (name.length < 2) return setStatus("Por favor, indica tu nombre (mín. 2 caracteres).", false);
+      if (!isValidEmail(email)) return setStatus("Por favor, escribe un email válido.", false);
+      if (!type) return setStatus("Selecciona el tipo de proyecto.", false);
+      if (message.length < 10) return setStatus("Cuéntame un poco más (mín. 10 caracteres).", false);
+
+      // Change this to your real email
+      const to = "hola@sebastianbogado.com";
+
+      const subject = encodeURIComponent(`Solicitud: ${type} — ${name}`);
+      const body = encodeURIComponent(
+        `Nombre: ${name}\nEmail: ${email}\nTipo: ${type}\n\nMensaje:\n${message}\n\n---\nEnviado desde sebastianbogado.com`
+      );
+
+      track("lead_submit", { type });
+
+      setStatus("Abriendo tu correo para enviar el mensaje…");
+      window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
+      form.reset();
+    });
+  }
+
+  // Optional: WhatsApp placeholder guard
+  const waLinks = [$("#whatsAppFab"), $("#whatsAppLink")].filter(Boolean);
+  waLinks.forEach((a) => {
+    if (!a) return;
+    const href = a.getAttribute("href") || "";
+    if (href.includes("34XXXXXXXXX")) {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        alert("Falta configurar tu número de WhatsApp en el enlace (reemplaza 34XXXXXXXXX).");
+      });
+    }
+  });
+})();
